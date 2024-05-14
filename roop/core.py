@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import onnxruntime
 import os
 import sys
 import warnings
