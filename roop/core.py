@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
-import onnxruntime
 import os
 import sys
+# single thread doubles cuda performance - needs to be set before torch import
+if any(arg.startswith('--execution-provider') for arg in sys.argv):
+    os.environ['OMP_NUM_THREADS'] = '1'
+# reduce tensorflow log level
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import warnings
-import argparse
+from typing import List
 import platform
 import signal
 import shutil
+import argparse
+import onnxruntime
+import tensorflow
+import onnxruntime
+import argparse
+import platform
 from typing import List
 import roop.globals
 import roop.metadata
