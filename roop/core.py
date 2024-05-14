@@ -1,30 +1,18 @@
-#!/usr/bin/env python3
-
 import os
 import sys
-# single thread doubles cuda performance - needs to be set before torch import
-if any(arg.startswith('--execution-provider') for arg in sys.argv):
-    os.environ['OMP_NUM_THREADS'] = '1'
-# reduce tensorflow log level
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import warnings
-from typing import List
-import platform
-import signal
 import shutil
 import argparse
-import onnxruntime
+import platform
+import signal
 import tensorflow
+import onnxruntime
+from typing import List
 import roop.globals
 import roop.metadata
 import roop.ui as ui
-from roop.predictor import predict_image, predict_video
 from roop.processors.frame.core import get_frame_processors_modules
 from roop.utilities import has_image_extension, is_image, is_video, detect_fps, create_video, extract_frames, get_temp_frame_paths, restore_audio, create_temp, move_temp, clean_temp, normalize_output_path
-
-warnings.filterwarnings('ignore', category=FutureWarning, module='insightface')
-warnings.filterwarnings('ignore', category=UserWarning, module='torchvision')
-
 
 def parse_args() -> None:
     signal.signal(signal.SIGINT, lambda signal_number, frame: destroy())
@@ -71,25 +59,20 @@ def parse_args() -> None:
     roop.globals.execution_providers = decode_execution_providers(args.execution_provider)
     roop.globals.execution_threads = args.execution_threads
 
-
 def encode_execution_providers(execution_providers: List[str]) -> List[str]:
     return [execution_provider.replace('ExecutionProvider', '').lower() for execution_provider in execution_providers]
-
 
 def decode_execution_providers(execution_providers: List[str]) -> List[str]:
     return [provider for provider, encoded_execution_provider in zip(onnxruntime.get_available_providers(), encode_execution_providers(onnxruntime.get_available_providers()))
             if any(execution_provider in encoded_execution_provider for execution_provider in execution_providers)]
 
-
 def suggest_execution_providers() -> List[str]:
     return encode_execution_providers(onnxruntime.get_available_providers())
-
 
 def suggest_execution_threads() -> int:
     if 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
         return 8
     return 1
-
 
 def limit_resources() -> None:
     # prevent tensorflow memory leak
@@ -111,7 +94,6 @@ def limit_resources() -> None:
             import resource
             resource.setrlimit(resource.RLIMIT_DATA, (memory, memory))
 
-
 def pre_check() -> bool:
     if sys.version_info < (3, 9):
         update_status('Python version is not supported - please upgrade to 3.9 or higher.')
@@ -121,39 +103,16 @@ def pre_check() -> bool:
         return False
     return True
 
-
 def update_status(message: str, scope: str = 'ROOP.CORE') -> None:
     print(f'[{scope}] {message}')
     if not roop.globals.headless:
         ui.update_status(message)
 
-
 def start() -> None:
     for frame_processor in get_frame_processors_modules(roop.globals.frame_processors):
         if not frame_processor.pre_start():
             return
-    # process image to image
-    if has_image_extension(roop.globals.target_path):
-        if predict_image(roop.globals.target_path):
-            destroy()
-        shutil.copy2(roop.globals.target_path, roop.globals.output_path)
-        # process frame
-        for frame_processor in get_frame_processors_modules(roop.globals.frame_processors):
-            update_status('Progressing...', frame_processor.NAME)
-            frame_processor.process_image(roop.globals.source_path, roop.globals.output_path, roop.globals.output_path)
-            frame_processor.post_process()
-        # validate image
-        if is_image(roop.globals.target_path):
-            update_status('Processing to image succeed!')
-        else:
-            update_status('Processing to image failed!')
-        return
-    # process image to videos
-    if predict_video(roop.globals.target_path):
-        destroy()
-    update_status('Creating temporary resources...')
-    create_temp(roop.globals.target_path)
-    # extract frames
+    # Extract frames
     if roop.globals.keep_fps:
         fps = detect_fps(roop.globals.target_path)
         update_status(f'Extracting frames with {fps} FPS...')
@@ -161,7 +120,7 @@ def start() -> None:
     else:
         update_status('Extracting frames with 30 FPS...')
         extract_frames(roop.globals.target_path)
-    # process frame
+    # Process frames
     temp_frame_paths = get_temp_frame_paths(roop.globals.target_path)
     if temp_frame_paths:
         for frame_processor in get_frame_processors_modules(roop.globals.frame_processors):
@@ -171,7 +130,7 @@ def start() -> None:
     else:
         update_status('Frames not found...')
         return
-    # create video
+    # Create video
     if roop.globals.keep_fps:
         fps = detect_fps(roop.globals.target_path)
         update_status(f'Creating video with {fps} FPS...')
@@ -179,7 +138,7 @@ def start() -> None:
     else:
         update_status('Creating video with 30 FPS...')
         create_video(roop.globals.target_path)
-    # handle audio
+    # Handle audio
     if roop.globals.skip_audio:
         move_temp(roop.globals.target_path, roop.globals.output_path)
         update_status('Skipping audio...')
@@ -189,21 +148,19 @@ def start() -> None:
         else:
             update_status('Restoring audio might cause issues as fps are not kept...')
         restore_audio(roop.globals.target_path, roop.globals.output_path)
-    # clean temp
+    # Clean temp
     update_status('Cleaning temporary resources...')
     clean_temp(roop.globals.target_path)
-    # validate video
+    # Validate video
     if is_video(roop.globals.target_path):
         update_status('Processing to video succeed!')
     else:
         update_status('Processing to video failed!')
 
-
 def destroy() -> None:
     if roop.globals.target_path:
         clean_temp(roop.globals.target_path)
     sys.exit()
-
 
 def run() -> None:
     parse_args()
@@ -218,3 +175,6 @@ def run() -> None:
     else:
         window = ui.init(start, destroy)
         window.mainloop()
+
+if __name__ == "__main__":
+    run()
