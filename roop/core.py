@@ -79,13 +79,12 @@ def decode_execution_providers(execution_providers: List[str]) -> List[str]:
 
 
 def suggest_execution_providers() -> List[str]:
-    return encode_execution_providers(onnxruntime.get_available_providers())
+    # Dummy implementation: Return a predefined list of execution providers
+    return ['cpu']
 
-
-def suggest_execution_threads() -> int:
-    if 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
-        return 8
-    return 1
+def decode_execution_providers(execution_providers: List[str]) -> List[str]:
+    # Dummy implementation: Return the input list without modification
+    return execution_providers
 
 
 def limit_resources() -> None:
