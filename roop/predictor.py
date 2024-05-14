@@ -1,56 +1,54 @@
+import threading
+import numpy as np
 import cv2
 from roop.typing import Frame
 
-# Function for processing a frame without NSFW filtering using OpenCV
-def process_frame(target_frame: Frame):
-    # Processing code goes here
+PREDICTOR = None
+THREAD_LOCK = threading.Lock()
+MAX_PROBABILITY = 0.85
+
+
+def get_predictor() -> None:
+    # This function is not needed as we are not using a pre-trained model
     pass
 
-# Function for processing an image without NSFW filtering using OpenCV
-def process_image(target_path: str):
-    # Read the image
-    image = cv2.imread(target_path)
-    
-    # Example processing: Convert image to grayscale
-    grayscale_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    # Example processing: Resize image to 100x100 pixels
-    resized_image = cv2.resize(grayscale_image, (100, 100))
-    
-    # Save the processed image
-    processed_path = "processed_image_opencv.jpg"
-    cv2.imwrite(processed_path, resized_image)
-    
-    return processed_path
 
-# Function for processing a video without NSFW filtering using OpenCV
-def process_video(target_path: str):
-    # Open the video file
-    video_capture = cv2.VideoCapture(target_path)
-    
-    # Read and process each frame
-    while True:
-        ret, frame = video_capture.read()
+def clear_predictor() -> None:
+    # This function is not needed as we are not using a pre-trained model
+    pass
+
+
+def predict_frame(target_frame: Frame) -> bool:
+    # Convert frame to grayscale
+    gray_frame = cv2.cvtColor(target_frame, cv2.COLOR_BGR2GRAY)
+    # Use a simple thresholding technique to detect NSFW content
+    _, thresholded_frame = cv2.threshold(gray_frame, 127, 255, cv2.THRESH_BINARY)
+    # Calculate the percentage of white pixels in the frame
+    white_pixel_percentage = np.sum(thresholded_frame == 255) / target_frame.size
+    return white_pixel_percentage > MAX_PROBABILITY
+
+
+def predict_image(target_path: str) -> bool:
+    # Load the image
+    image = cv2.imread(target_path)
+    if image is None:
+        raise ValueError("Unable to load the image.")
+    # Predict NSFW content in the image
+    return predict_frame(image)
+
+
+def predict_video(target_path: str) -> bool:
+    # Initialize the video capture object
+    cap = cv2.VideoCapture(target_path)
+    if not cap.isOpened():
+        raise ValueError("Unable to open the video file.")
+    # Read frames from the video and predict NSFW content
+    while cap.isOpened():
+        ret, frame = cap.read()
         if not ret:
             break
-        
-        # Example processing: Convert frame to grayscale
-        grayscale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
-        # Example processing: Resize frame to 100x100 pixels
-        resized_frame = cv2.resize(grayscale_frame, (100, 100))
-        
-        # Process the frame (you can implement your own processing logic here)
-        process_frame(resized_frame)
-    
+        if predict_frame(frame):
+            return True
     # Release the video capture object
-    video_capture.release()
-
-# Example usage
-input_image_path = "input_image.jpg"
-input_video_path = "input_video.mp4"
-
-processed_image_path_opencv = process_image(input_image_path)
-print("Processed image saved (using OpenCV):", processed_image_path_opencv)
-
-process_video(input_video_path)
+    cap.release()
+    return False
